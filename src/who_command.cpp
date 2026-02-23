@@ -41,15 +41,16 @@ int runWhoCommand(int argc, char *argv[]) {
   }
 
   if (result.output.empty()) {
-    std::cout << "Port " << *port << " appears free (no LISTEN process found).\n";
-    return 0;
+    std::cerr << "Unexpected state: command succeeded but produced no output for port " << *port
+              << ".\n";
+    return 1;
   }
 
   ListenerInfo info;
   if (!parseFirstListener(result.output, info)) {
-    std::cout << "Port " << *port << " is in use, but failed to parse listener details.\n";
-    std::cout << "Raw lsof fields:\n" << result.output;
-    return 0;
+    std::cerr << "Port " << *port << " is in use, but failed to parse listener details.\n";
+    std::cerr << "Raw lsof fields:\n" << result.output;
+    return 1;
   }
 
   std::cout << "Port " << *port << " is in use.\n";
