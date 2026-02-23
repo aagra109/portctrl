@@ -49,7 +49,7 @@ static std::optional<int> parsePort(const std::string &text) {
 static CommandResult runCommand(const std::string &command) {
   CommandResult result{1, ""};
 
-  FILE *pipe = popen(command.c_str(), "r");
+  FILE *pipe = popen((command + " 2>&1").c_str(), "r");
   if (pipe == nullptr) {
     result.output = "Failed to execute command.";
     return result;
@@ -86,30 +86,40 @@ static std::vector<std::string> splitLines(const std::string &text) {
 
 static bool parseFirstListener(const std::string &raw, ListenerInfo &out) {
   auto lines = splitLines(raw);
-  if (lines.size() < 2)
-    return false; // header + at least one data row
+  std::string currentPid;
+  std::string currentCommand;
+  std::string currentUser;
+  std::string currentEndpoint;
 
-  std::stringstream ss(lines[1]);
-  std::vector<std::string> cols;
-  std::string token;
-  while (ss >> token)
-    cols.push_back(token);
+  for (const auto &line : lines) {
+    if (line.size() < 2)
+      continue;
+    char tag = line[0];
+    std::string value = line.substr(1);
 
-  if (cols.size() < 9)
-    return false;
+    if (tag == 'p') {
+      currentPid = value;
+      currentCommand.clear();
+      currentUser.clear();
+      currentEndpoint.clear();
+    } else if (tag == 'c') {
+      currentCommand = value;
+    } else if (tag == 'u') {
+      currentUser = value;
+    } else if (tag == 'n') {
+      currentEndpoint = value;
 
-  out.command = cols[0];
-  out.pid = cols[1];
-  out.user = cols[2];
-
-  out.endpoint.clear();
-  for (size_t i = 8; i < cols.size(); ++i) {
-    if (i > 8)
-      out.endpoint += " ";
-    out.endpoint += cols[i];
+      if (!currentPid.empty()) {
+        out.pid = currentPid;
+        out.command = currentCommand.empty() ? "unknown" : currentCommand;
+        out.user = currentUser.empty() ? "unknown" : currentUser;
+        out.endpoint = currentEndpoint;
+        return true;
+      }
+    }
   }
 
-  return true;
+  return false;
 }
 
 int main(int argc, char *argv[]) {
@@ -132,7 +142,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    std::string lsofCommand = "lsof -nP -iTCP:" + std::to_string(*port) + " -sTCP:LISTEN";
+    std::string lsofCommand = "lsof -nP -iTCP:" + std::to_string(*port) + " -sTCP:LISTEN -Fpcun";
     CommandResult result = runCommand(lsofCommand);
 
     if (result.exitCode == 1 && result.output.empty()) {
@@ -161,7 +171,7 @@ int main(int argc, char *argv[]) {
     ListenerInfo info;
     if (!parseFirstListener(result.output, info)) {
       std::cout << "Port " << *port << " is in use, but failed to parse listener details.\n";
-      std::cout << "Raw output:\n" << result.output;
+      std::cout << "Raw lsof fields:\n" << result.output;
       return 0;
     }
 
