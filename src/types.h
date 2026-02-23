@@ -3,7 +3,7 @@
 #include <string>
 
 struct CommandResult {
-  int exitCode;
+  int exitCode = -1;
   std::string output;
 };
 
