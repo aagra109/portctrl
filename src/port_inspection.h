@@ -5,7 +5,7 @@
 #include <string>
 
 std::optional<int> parsePort(const std::string &text);
-CommandResult runCommand(const std::string &command);
+CommandResult runListenerInspectCommand(int port);
 bool parseFirstListener(const std::string &raw, ListenerInfo &out);
 std::string listenerInspectCommand(int port);
 bool inspectPort(int port, std::optional<ListenerInfo> &listener, std::string &error);

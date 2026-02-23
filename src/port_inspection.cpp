@@ -25,7 +25,7 @@ std::optional<int> parsePort(const std::string &text) {
   }
 }
 
-CommandResult runCommand(const std::string &command) {
+static CommandResult runCommand(const std::string &command) {
   CommandResult result{1, ""};
 
   FILE *pipe = popen((command + " 2>&1").c_str(), "r");
@@ -105,8 +105,12 @@ std::string listenerInspectCommand(int port) {
   return "lsof -nP -iTCP:" + std::to_string(port) + " -sTCP:LISTEN -Fpcun";
 }
 
+CommandResult runListenerInspectCommand(int port) {
+  return runCommand(listenerInspectCommand(port));
+}
+
 bool inspectPort(int port, std::optional<ListenerInfo> &listener, std::string &error) {
-  CommandResult result = runCommand(listenerInspectCommand(port));
+  CommandResult result = runListenerInspectCommand(port);
 
   if (result.exitCode == 1 && result.output.empty()) {
     listener.reset();

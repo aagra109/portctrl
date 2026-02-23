@@ -184,8 +184,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    std::string lsofCommand = "lsof -nP -iTCP:" + std::to_string(*port) + " -sTCP:LISTEN -Fpcun";
-    CommandResult result = runCommand(lsofCommand);
+    CommandResult result = runListenerInspectCommand(*port);
 
     if (result.exitCode == 1 && result.output.empty()) {
       std::cout << "Port " << *port << " appears free (no LISTEN process found).\n";
