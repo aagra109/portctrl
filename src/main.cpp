@@ -1,7 +1,15 @@
 #include <cctype>
 #include <cstdio>
 #include <iostream>
+#include <optional>
+#include <stdexcept>
 #include <string>
+#include <sys/wait.h>
+
+struct CommandResult {
+  int exitCode;
+  std::string output;
+};
 
 static void usage() {
   std::cout << "portdoctor usage:\n"
@@ -10,33 +18,49 @@ static void usage() {
             << "  portdoctor history [--limit <n>]\n";
 }
 
-static bool isValidPort(const std::string &text) {
+static std::optional<int> parsePort(const std::string &text) {
   if (text.empty())
-    return false;
+    return std::nullopt;
 
   for (char ch : text) {
     if (!std::isdigit(static_cast<unsigned char>(ch)))
-      return false;
+      return std::nullopt;
   }
 
-  int port = std::stoi(text);
-  return port >= 1 && port <= 65535;
+  try {
+    long value = std::stol(text);
+    if (value < 1 || value > 65535)
+      return std::nullopt;
+    return static_cast<int>(value);
+  } catch (const std::exception &) {
+    return std::nullopt;
+  }
 }
 
-static std::string runCommand(const std::string &command) {
+static CommandResult runCommand(const std::string &command) {
+  CommandResult result{1, ""};
+
   FILE *pipe = popen(command.c_str(), "r");
-  if (pipe == nullptr)
-    return "";
-
-  char buffer[256];
-  std::string output;
-
-  while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-    output += buffer;
+  if (pipe == nullptr) {
+    result.output = "Failed to execute command.";
+    return result;
   }
 
-  pclose(pipe);
-  return output;
+  char buffer[256];
+  while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+    result.output += buffer;
+  }
+
+  int status = pclose(pipe);
+  if (status == -1) {
+    result.exitCode = 1;
+  } else if (WIFEXITED(status)) {
+    result.exitCode = WEXITSTATUS(status);
+  } else {
+    result.exitCode = 1;
+  }
+
+  return result;
 }
 
 int main(int argc, char *argv[]) {
@@ -52,22 +76,41 @@ int main(int argc, char *argv[]) {
       usage();
       return 1;
     }
-    std::string port = argv[2];
-    if (!isValidPort(port)) {
-      std::cerr << "Invalid port: " << port << "\n";
+    std::string portText = argv[2];
+    auto port = parsePort(portText);
+    if (!port.has_value()) {
+      std::cerr << "Invalid port: " << portText << "\n";
       return 1;
     }
 
-    std::string lsofCommand = "lsof -nP -iTCP:" + port + " -sTCP:LISTEN";
-    std::string output = runCommand(lsofCommand);
+    std::string lsofCommand = "lsof -nP -iTCP:" + std::to_string(*port) + " -sTCP:LISTEN";
+    CommandResult result = runCommand(lsofCommand);
 
-    if (output.empty()) {
-      std::cout << "Port " << port << " appears free (no LISTEN process found).\n";
+    if (result.exitCode == 1 && result.output.empty()) {
+      std::cout << "Port " << *port << " appears free (no LISTEN process found).\n";
       return 0;
     }
 
-    std::cout << "Raw lsof output for port " << port << ":\n";
-    std::cout << output;
+    if (result.exitCode == 1 && !result.output.empty()) {
+      std::cerr << "Failed to inspect port " << *port << ".\n";
+      std::cerr << result.output;
+      return 1;
+    }
+
+    if (result.exitCode != 0 && result.exitCode != 1) {
+      std::cerr << "Failed to inspect port " << *port << ".\n";
+      if (!result.output.empty())
+        std::cerr << result.output;
+      return 1;
+    }
+
+    if (result.output.empty()) {
+      std::cout << "Port " << *port << " appears free (no LISTEN process found).\n";
+      return 0;
+    }
+
+    std::cout << "Raw lsof output for port " << *port << ":\n";
+    std::cout << result.output;
     return 0;
   }
 
