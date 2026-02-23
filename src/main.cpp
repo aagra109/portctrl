@@ -2,13 +2,22 @@
 #include <cstdio>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <sys/wait.h>
+#include <vector>
 
 struct CommandResult {
   int exitCode;
   std::string output;
+};
+
+struct ListenerInfo {
+  std::string command;
+  std::string pid;
+  std::string user;
+  std::string endpoint;
 };
 
 static void usage() {
@@ -63,6 +72,46 @@ static CommandResult runCommand(const std::string &command) {
   return result;
 }
 
+static std::vector<std::string> splitLines(const std::string &text) {
+  std::vector<std::string> lines;
+  std::stringstream ss(text);
+  std::string line;
+  while (std::getline(ss, line)) {
+    if (!line.empty() && line.back() == '\r')
+      line.pop_back();
+    lines.push_back(line);
+  }
+  return lines;
+}
+
+static bool parseFirstListener(const std::string &raw, ListenerInfo &out) {
+  auto lines = splitLines(raw);
+  if (lines.size() < 2)
+    return false; // header + at least one data row
+
+  std::stringstream ss(lines[1]);
+  std::vector<std::string> cols;
+  std::string token;
+  while (ss >> token)
+    cols.push_back(token);
+
+  if (cols.size() < 9)
+    return false;
+
+  out.command = cols[0];
+  out.pid = cols[1];
+  out.user = cols[2];
+
+  out.endpoint.clear();
+  for (size_t i = 8; i < cols.size(); ++i) {
+    if (i > 8)
+      out.endpoint += " ";
+    out.endpoint += cols[i];
+  }
+
+  return true;
+}
+
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     usage();
@@ -109,8 +158,18 @@ int main(int argc, char *argv[]) {
       return 0;
     }
 
-    std::cout << "Raw lsof output for port " << *port << ":\n";
-    std::cout << result.output;
+    ListenerInfo info;
+    if (!parseFirstListener(result.output, info)) {
+      std::cout << "Port " << *port << " is in use, but failed to parse listener details.\n";
+      std::cout << "Raw output:\n" << result.output;
+      return 0;
+    }
+
+    std::cout << "Port " << *port << " is in use.\n";
+    std::cout << "Process: " << info.command << "\n";
+    std::cout << "PID: " << info.pid << "\n";
+    std::cout << "User: " << info.user << "\n";
+    std::cout << "Endpoint: " << info.endpoint << "\n";
     return 0;
   }
 
