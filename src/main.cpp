@@ -1,3 +1,5 @@
+#include "types.h"
+#include "usage.h"
 #include <cctype>
 #include <chrono>
 #include <csignal>
@@ -13,37 +15,6 @@
 #include <thread>
 #include <unistd.h>
 #include <vector>
-
-struct CommandResult {
-  int exitCode;
-  std::string output;
-};
-
-struct ListenerInfo {
-  std::string command;
-  std::string pid;
-  std::string user;
-  std::string endpoint;
-};
-
-enum class GracefulSignal {
-  kTerm,
-  kInt,
-};
-
-struct FreeOptions {
-  bool apply = false;
-  bool force = false;
-  bool yes = false;
-  GracefulSignal gracefulSignal = GracefulSignal::kTerm;
-};
-
-static void usage() {
-  std::cout << "portdoctor usage:\n"
-            << "  portdoctor who <port>\n"
-            << "  portdoctor free <port> [--apply] [--force] [--yes] [--signal INT|TERM]\n"
-            << "  portdoctor history [--limit <n>]\n";
-}
 
 static std::optional<int> parsePort(const std::string &text) {
   if (text.empty())
