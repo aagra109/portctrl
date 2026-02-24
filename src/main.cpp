@@ -1,4 +1,5 @@
 #include "free_command.h"
+#include "list_command.h"
 #include "usage.h"
 #include "who_command.h"
 
@@ -20,9 +21,8 @@ int main(int argc, char *argv[]) {
     return runFreeCommand(argc, argv);
   }
 
-  if (cmd == "history") {
-    std::cout << "[stub] history\n";
-    return 0;
+  if (cmd == "list") {
+    return runListCommand(argc, argv);
   }
 
   usage();
