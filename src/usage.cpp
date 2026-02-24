@@ -6,5 +6,5 @@ void usage() {
   std::cout << "portctrl usage:\n"
             << "  portctrl who <port>\n"
             << "  portctrl free <port> [--apply] [--force] [--yes] [--signal INT|TERM]\n"
-            << "  portctrl history [--limit <n>]\n";
+            << "  portctrl list\n";
 }
