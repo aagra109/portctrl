@@ -1,9 +1,9 @@
 #include "port_inspection.h"
+#include "command_exec.h"
+
 #include <cctype>
-#include <cstdio>
 #include <sstream>
 #include <stdexcept>
-#include <sys/wait.h>
 #include <vector>
 
 std::optional<int> parsePort(const std::string &text) {
@@ -23,32 +23,6 @@ std::optional<int> parsePort(const std::string &text) {
   } catch (const std::exception &) {
     return std::nullopt;
   }
-}
-
-static CommandResult runCommand(const std::string &command) {
-  CommandResult result{1, ""};
-
-  FILE *pipe = popen((command + " 2>&1").c_str(), "r");
-  if (pipe == nullptr) {
-    result.output = "Failed to execute command.";
-    return result;
-  }
-
-  char buffer[256];
-  while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-    result.output += buffer;
-  }
-
-  int status = pclose(pipe);
-  if (status == -1) {
-    result.exitCode = 1;
-  } else if (WIFEXITED(status)) {
-    result.exitCode = WEXITSTATUS(status);
-  } else {
-    result.exitCode = 1;
-  }
-
-  return result;
 }
 
 static std::vector<std::string> splitLines(const std::string &text) {
