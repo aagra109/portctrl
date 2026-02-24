@@ -1,4 +1,5 @@
 #include "free_command.h"
+#include "free_options.h"
 #include "port_inspection.h"
 #include "types.h"
 #include "usage.h"
@@ -51,21 +52,6 @@ static std::optional<pid_t> parseSignalablePid(const std::string &text) {
   return pid;
 }
 
-static std::optional<GracefulSignal> parseGracefulSignal(const std::string &text) {
-  std::string normalized = text;
-  for (char &ch : normalized) {
-    ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
-  }
-
-  if (normalized == "INT" || normalized == "SIGINT") {
-    return GracefulSignal::kInt;
-  }
-  if (normalized == "TERM" || normalized == "SIGTERM") {
-    return GracefulSignal::kTerm;
-  }
-  return std::nullopt;
-}
-
 static std::string gracefulSignalName(GracefulSignal signal) {
   switch (signal) {
   case GracefulSignal::kInt:
@@ -84,47 +70,6 @@ static int gracefulSignalValue(GracefulSignal signal) {
   default:
     return SIGTERM;
   }
-}
-
-static bool parseFreeOptions(int argc, char *argv[], FreeOptions &options, std::string &error) {
-  for (int i = 3; i < argc; ++i) {
-    std::string arg = argv[i];
-    if (arg == "--apply") {
-      options.apply = true;
-      continue;
-    }
-    if (arg == "--force") {
-      options.force = true;
-      continue;
-    }
-    if (arg == "--yes") {
-      options.yes = true;
-      continue;
-    }
-    if (arg == "--signal") {
-      if (i + 1 >= argc) {
-        error = "Missing value for --signal. Expected INT or TERM.";
-        return false;
-      }
-      std::string value = argv[++i];
-      auto parsedSignal = parseGracefulSignal(value);
-      if (!parsedSignal.has_value()) {
-        error = "Invalid --signal value: " + value + " (expected INT or TERM).";
-        return false;
-      }
-      options.gracefulSignal = *parsedSignal;
-      continue;
-    }
-    error = "Unknown option for free: " + arg;
-    return false;
-  }
-
-  if (options.force && !options.apply) {
-    error = "--force requires --apply.";
-    return false;
-  }
-
-  return true;
 }
 
 static bool confirmAction(const std::string &prompt, bool autoYes) {
