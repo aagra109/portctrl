@@ -1,7 +1,7 @@
 CXX ?= clang++
 CXXFLAGS ?= -std=c++20 -Wall -Wextra -Wpedantic -O2
 SRC := $(wildcard src/*.cpp)
-TARGET := bin/portdoctor
+TARGET := bin/portctrl
 
 .PHONY: all clean
 
@@ -13,4 +13,3 @@ $(TARGET): $(SRC)
 
 clean:
 	rm -rf bin
-

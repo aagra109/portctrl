@@ -3,8 +3,8 @@
 #include <iostream>
 
 void usage() {
-  std::cout << "portdoctor usage:\n"
-            << "  portdoctor who <port>\n"
-            << "  portdoctor free <port> [--apply] [--force] [--yes] [--signal INT|TERM]\n"
-            << "  portdoctor history [--limit <n>]\n";
+  std::cout << "portctrl usage:\n"
+            << "  portctrl who <port>\n"
+            << "  portctrl free <port> [--apply] [--force] [--yes] [--signal INT|TERM]\n"
+            << "  portctrl history [--limit <n>]\n";
 }
