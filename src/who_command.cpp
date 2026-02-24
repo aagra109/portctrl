@@ -4,7 +4,6 @@
 #include "usage.h"
 
 #include <iostream>
-#include <optional>
 #include <string>
 
 int runWhoCommand(int argc, char *argv[]) {
@@ -20,39 +19,19 @@ int runWhoCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  CommandResult result = runListenerInspectCommand(*port);
+  InspectResult inspect = inspectPort(*port);
 
-  if (result.exitCode == 1 && result.output.empty()) {
+  if (inspect.status == InspectStatus::kError) {
+    std::cerr << inspect.error << "\n";
+    return 1;
+  }
+
+  if (inspect.status == InspectStatus::kFree || !inspect.listener.has_value()) {
     std::cout << "Port " << *port << " appears free (no LISTEN process found).\n";
     return 0;
   }
 
-  if (result.exitCode == 1 && !result.output.empty()) {
-    std::cerr << "Failed to inspect port " << *port << ".\n";
-    std::cerr << result.output;
-    return 1;
-  }
-
-  if (result.exitCode != 0 && result.exitCode != 1) {
-    std::cerr << "Failed to inspect port " << *port << ".\n";
-    if (!result.output.empty())
-      std::cerr << result.output;
-    return 1;
-  }
-
-  if (result.output.empty()) {
-    std::cerr << "Unexpected state: command succeeded but produced no output for port " << *port
-              << ".\n";
-    return 1;
-  }
-
-  ListenerInfo info;
-  if (!parseFirstListener(result.output, info)) {
-    std::cerr << "Port " << *port << " is in use, but failed to parse listener details.\n";
-    std::cerr << "Raw lsof fields:\n" << result.output;
-    return 1;
-  }
-
+  const ListenerInfo &info = *inspect.listener;
   std::cout << "Port " << *port << " is in use.\n";
   std::cout << "Process: " << info.command << "\n";
   std::cout << "PID: " << info.pid << "\n";
