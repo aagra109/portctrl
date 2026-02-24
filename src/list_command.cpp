@@ -105,10 +105,17 @@ static bool sortByPortThenPid(const ListenerEntry &a, const ListenerEntry &b) {
 
   if (a.pid != b.pid)
     return a.pid < b.pid;
+  if (a.user != b.user)
+    return a.user < b.user;
   if (a.command != b.command)
     return a.command < b.command;
 
   return a.endpoint < b.endpoint;
+}
+
+static bool sameListener(const ListenerEntry &a, const ListenerEntry &b) {
+  return a.port == b.port && a.pid == b.pid && a.user == b.user && a.command == b.command &&
+         a.endpoint == b.endpoint;
 }
 
 int runListCommand(int argc, char *argv[]) {
@@ -151,6 +158,8 @@ int runListCommand(int argc, char *argv[]) {
   }
 
   std::sort(listeners.begin(), listeners.end(), sortByPortThenPid);
+
+  listeners.erase(std::unique(listeners.begin(), listeners.end(), sameListener), listeners.end());
 
   std::cout << "Listening TCP endpoints: " << listeners.size() << "\n";
   for (const auto &listener : listeners) {
