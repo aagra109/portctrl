@@ -37,7 +37,7 @@ static std::vector<std::string> splitLines(const std::string &text) {
   return lines;
 }
 
-bool parseFirstListener(const std::string &raw, ListenerInfo &out) {
+static bool parseFirstListener(const std::string &raw, ListenerInfo &out) {
   auto lines = splitLines(raw);
   std::string currentPid;
   std::string currentCommand;
@@ -75,11 +75,11 @@ bool parseFirstListener(const std::string &raw, ListenerInfo &out) {
   return false;
 }
 
-std::string listenerInspectCommand(int port) {
+static std::string listenerInspectCommand(int port) {
   return "lsof -nP -iTCP:" + std::to_string(port) + " -sTCP:LISTEN -Fpcun";
 }
 
-CommandResult runListenerInspectCommand(int port) {
+static CommandResult runListenerInspectCommand(int port) {
   return runCommand(listenerInspectCommand(port));
 }
 
