@@ -88,7 +88,7 @@ int runFreeCommand(int argc, char *argv[]) {
 
   if (!options.apply) {
     std::cout << "Dry-run mode: no signal sent.\n";
-    std::cout << "Run: ./bin/portdoctor free " << *port << " --apply";
+    std::cout << "Run: ./bin/portctrl free " << *port << " --apply";
     if (options.gracefulSignal != GracefulSignal::kTerm) {
       std::cout << " --signal " << gracefulName;
     }
