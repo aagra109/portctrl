@@ -189,7 +189,7 @@ int runFreeCommand(int argc, char *argv[]) {
   std::optional<ListenerInfo> listener;
   std::string inspectError;
   if (!inspectPort(*port, listener, inspectError)) {
-    std::cerr << inspectError;
+    std::cerr << inspectError << "\n";
     return 1;
   }
 
