@@ -109,39 +109,45 @@ CommandResult runListenerInspectCommand(int port) {
   return runCommand(listenerInspectCommand(port));
 }
 
-bool inspectPort(int port, std::optional<ListenerInfo> &listener, std::string &error) {
+InspectResult inspectPort(int port) {
+  InspectResult inspect;
   CommandResult result = runListenerInspectCommand(port);
 
   if (result.exitCode == 1 && result.output.empty()) {
-    listener.reset();
-    return true;
+    inspect.status = InspectStatus::kFree;
+    return inspect;
   }
 
   if (result.exitCode != 0 && result.exitCode != 1) {
-    error = "Failed to inspect port " + std::to_string(port) + ".\n";
+    inspect.status = InspectStatus::kError;
+    inspect.error = "Failed to inspect port " + std::to_string(port) + ".";
     if (!result.output.empty()) {
-      error += result.output;
+      inspect.error += "\n" + result.output;
     }
-    return false;
+    return inspect;
   }
 
   if (result.exitCode == 1 && !result.output.empty()) {
-    error = "Failed to inspect port " + std::to_string(port) + ".\n" + result.output;
-    return false;
+    inspect.status = InspectStatus::kError;
+    inspect.error = "Failed to inspect port " + std::to_string(port) + ".\n" + result.output;
+    return inspect;
   }
 
   if (result.output.empty()) {
-    listener.reset();
-    return true;
+    inspect.status = InspectStatus::kFree;
+    return inspect;
   }
 
   ListenerInfo parsedListener;
   if (!parseFirstListener(result.output, parsedListener)) {
-    error = "Port " + std::to_string(port) +
-            " appears occupied, but listener parsing failed.\nRaw lsof fields:\n" + result.output;
-    return false;
+    inspect.status = InspectStatus::kError;
+    inspect.error = "Port " + std::to_string(port) +
+                    " appears occupied, but listener parsing failed.\nRaw lsof fields:\n" +
+                    result.output;
+    return inspect;
   }
 
-  listener = parsedListener;
-  return true;
+  inspect.status = InspectStatus::kOccupied;
+  inspect.listener = parsedListener;
+  return inspect;
 }

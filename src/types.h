@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 struct CommandResult {
@@ -24,4 +25,16 @@ struct FreeOptions {
   bool force = false;
   bool yes = false;
   GracefulSignal gracefulSignal = GracefulSignal::kTerm;
+};
+
+enum class InspectStatus {
+  kFree,
+  kOccupied,
+  kError,
+};
+
+struct InspectResult {
+  InspectStatus status = InspectStatus::kError;
+  std::optional<ListenerInfo> listener;
+  std::string error;
 };

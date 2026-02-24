@@ -186,20 +186,20 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  std::optional<ListenerInfo> listener;
-  std::string inspectError;
-  if (!inspectPort(*port, listener, inspectError)) {
-    std::cerr << inspectError << "\n";
+  InspectResult inspect = inspectPort(*port);
+  if (inspect.status == InspectStatus::kError) {
+    std::cerr << inspect.error << "\n";
     return 1;
   }
 
-  if (!listener.has_value()) {
+  if (inspect.status == InspectStatus::kFree || !inspect.listener.has_value()) {
     std::cout << "Port " << *port << " is already free.\n";
     return 0;
   }
 
-  const ListenerInfo initialListener = *listener;
+  const ListenerInfo initialListener = *inspect.listener;
   auto initialPid = parseSignalablePid(initialListener.pid);
+
   if (!initialPid.has_value()) {
     std::cerr << "Refusing to signal invalid PID '" << initialListener.pid << "'.\n";
     return 1;
@@ -234,15 +234,15 @@ int runFreeCommand(int argc, char *argv[]) {
 
   std::this_thread::sleep_for(std::chrono::milliseconds(900));
 
-  std::optional<ListenerInfo> afterGracefulListener;
-  std::string afterGracefulError;
-  if (!inspectPort(*port, afterGracefulListener, afterGracefulError)) {
+  InspectResult afterGraceful = inspectPort(*port);
+
+  if (afterGraceful.status == InspectStatus::kError) {
     std::cerr << "Sent SIG" << gracefulName << ", but failed to re-check port " << *port << ".\n";
-    std::cerr << afterGracefulError;
+    std::cerr << afterGraceful.error;
     return 1;
   }
 
-  if (!afterGracefulListener.has_value()) {
+  if (afterGraceful.status == InspectStatus::kFree || !afterGraceful.listener.has_value()) {
     std::cout << "Success: port " << *port << " is now free.\n";
     return 0;
   }
@@ -253,8 +253,9 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  const ListenerInfo currentListener = *afterGracefulListener;
+  const ListenerInfo currentListener = *afterGraceful.listener;
   auto currentPid = parseSignalablePid(currentListener.pid);
+
   if (!currentPid.has_value()) {
     std::cerr << "Refusing to signal invalid PID '" << currentListener.pid << "'.\n";
     return 1;
@@ -277,20 +278,20 @@ int runFreeCommand(int argc, char *argv[]) {
 
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-  std::optional<ListenerInfo> afterForceListener;
-  std::string afterForceError;
-  if (!inspectPort(*port, afterForceListener, afterForceError)) {
+  InspectResult afterForce = inspectPort(*port);
+  if (afterForce.status == InspectStatus::kError) {
     std::cerr << "Sent SIGKILL, but failed to re-check port " << *port << ".\n";
-    std::cerr << afterForceError;
+    std::cerr << afterForce.error;
     return 1;
   }
 
-  if (!afterForceListener.has_value()) {
+  if (afterForce.status == InspectStatus::kFree || !afterForce.listener.has_value()) {
     std::cout << "Success: port " << *port << " is now free.\n";
     return 0;
   }
 
   std::cerr << "Port " << *port << " is still in use after SIGKILL by process "
-            << afterForceListener->command << " (PID " << afterForceListener->pid << ").\n";
+            << afterForce.listener->command << " (PID " << afterForce.listener->pid << ").\n";
+
   return 1;
 }
