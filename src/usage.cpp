@@ -1,5 +1,5 @@
-#include "cli_constants.h"
 #include "usage.h"
+#include "cli_constants.h"
 
 #include <iostream>
 

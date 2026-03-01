@@ -1,6 +1,6 @@
-#include "exit_codes.h"
 #include "list_command.h"
 #include "command_exec.h"
+#include "exit_codes.h"
 #include "table_output.h"
 #include "usage.h"
 
@@ -167,8 +167,7 @@ int runListCommand(int argc, char *argv[]) {
   rows.reserve(listeners.size());
   for (const auto &listener : listeners) {
     std::string portText = listener.port > 0 ? std::to_string(listener.port) : "unknown";
-    rows.push_back(
-        {portText, listener.pid, listener.user, listener.command, listener.endpoint});
+    rows.push_back({portText, listener.pid, listener.user, listener.command, listener.endpoint});
   }
   std::cout << renderTable({"PORT", "PID", "USER", "PROCESS", "ENDPOINT"}, rows) << "\n";
 

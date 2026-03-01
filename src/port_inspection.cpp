@@ -1,8 +1,8 @@
 #include "port_inspection.h"
 #include "command_exec.h"
 
-#include <cctype>
 #include <algorithm>
+#include <cctype>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -52,8 +52,7 @@ static bool sortByPidThenEndpoint(const ListenerInfo &a, const ListenerInfo &b) 
 }
 
 static bool sameListener(const ListenerInfo &a, const ListenerInfo &b) {
-  return a.pid == b.pid && a.user == b.user && a.command == b.command &&
-         a.endpoint == b.endpoint;
+  return a.pid == b.pid && a.user == b.user && a.command == b.command && a.endpoint == b.endpoint;
 }
 
 static std::vector<ListenerInfo> parseAllListeners(const std::string &raw) {
@@ -135,7 +134,8 @@ InspectResult inspectPort(int port) {
   if (inspect.listeners.empty()) {
     inspect.status = InspectStatus::kError;
     inspect.error = "Port " + std::to_string(port) +
-                    " appears occupied, but listener parsing failed.\nRaw lsof fields:\n" + result.output;
+                    " appears occupied, but listener parsing failed.\nRaw lsof fields:\n" +
+                    result.output;
     return inspect;
   }
 

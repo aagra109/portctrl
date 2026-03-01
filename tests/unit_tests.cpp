@@ -20,8 +20,7 @@ void expectTrue(bool condition, const std::string &name) {
   }
 }
 
-template <typename T>
-void expectEq(const T &actual, const T &expected, const std::string &name) {
+template <typename T> void expectEq(const T &actual, const T &expected, const std::string &name) {
   if (!(actual == expected)) {
     std::cerr << "FAIL: " << name << " (expected: " << expected << ", actual: " << actual << ")\n";
     ++g_failures;
@@ -49,8 +48,8 @@ void testParsePort() {
 void testParseFreeOptions() {
   FreeOptions options;
   std::string error;
-  bool ok = parseFreeOptionsFrom({"portctrl", "free", "3000", "--apply", "--signal", "INT", "--yes"},
-                                 options, error);
+  bool ok = parseFreeOptionsFrom(
+      {"portctrl", "free", "3000", "--apply", "--signal", "INT", "--yes"}, options, error);
   expectTrue(ok, "parseFreeOptions valid input");
   expectTrue(options.apply, "parseFreeOptions apply");
   expectTrue(options.yes, "parseFreeOptions yes");

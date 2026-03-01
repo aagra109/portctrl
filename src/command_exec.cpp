@@ -3,9 +3,9 @@
 #include <cerrno>
 #include <cstring>
 #include <string>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
-#include <sys/wait.h>
 
 CommandResult runCommand(const std::vector<std::string> &args) {
   CommandResult result{1, ""};
