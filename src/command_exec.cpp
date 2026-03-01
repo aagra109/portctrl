@@ -48,6 +48,8 @@ CommandResult runCommand(const std::vector<std::string> &args) {
     ::close(pipefd[1]);
 
     ::execvp(argv[0], argv.data());
+    static constexpr char kExecError[] = "Failed to execute command via execvp.\n";
+    (void)::write(STDERR_FILENO, kExecError, sizeof(kExecError) - 1);
     _exit(127);
   }
 
