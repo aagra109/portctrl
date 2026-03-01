@@ -24,6 +24,10 @@ enum class ConfirmResult {
   kRequiresYes,
 };
 
+static constexpr std::chrono::milliseconds kInspectPollInterval(100);
+static constexpr std::chrono::milliseconds kGracefulWaitTimeout(3000);
+static constexpr std::chrono::milliseconds kForceWaitTimeout(1500);
+
 static ConfirmResult confirmAction(const std::string &prompt, bool autoYes) {
   if (autoYes) {
     return ConfirmResult::kConfirmed;
@@ -107,6 +111,25 @@ listenerRowsForTable(const std::vector<ListenerInfo> &listeners) {
   return rows;
 }
 
+static InspectResult waitForPortState(int port, std::chrono::milliseconds timeout) {
+  auto deadline = std::chrono::steady_clock::now() + timeout;
+  InspectResult latest;
+
+  while (true) {
+    latest = inspectPort(port);
+    if (latest.status == InspectStatus::kError || latest.status == InspectStatus::kFree ||
+        latest.listeners.empty()) {
+      return latest;
+    }
+
+    if (std::chrono::steady_clock::now() >= deadline) {
+      return latest;
+    }
+
+    std::this_thread::sleep_for(kInspectPollInterval);
+  }
+}
+
 int runFreeCommand(int argc, char *argv[]) {
   if (argc < 3) {
     std::cerr << "Missing port.\n";
@@ -183,9 +206,7 @@ int runFreeCommand(int argc, char *argv[]) {
     return toExitCode(gracefulSignalResult);
   }
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(900));
-
-  InspectResult afterGraceful = inspectPort(*port);
+  InspectResult afterGraceful = waitForPortState(*port, kGracefulWaitTimeout);
 
   if (afterGraceful.status == InspectStatus::kError) {
     std::cerr << "Sent SIG" << gracefulName << ", but failed to re-check port " << *port << ".\n";
@@ -233,9 +254,7 @@ int runFreeCommand(int argc, char *argv[]) {
     return toExitCode(forceSignalResult);
   }
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-  InspectResult afterForce = inspectPort(*port);
+  InspectResult afterForce = waitForPortState(*port, kForceWaitTimeout);
   if (afterForce.status == InspectStatus::kError) {
     std::cerr << "Sent SIGKILL, but failed to re-check port " << *port << ".\n";
     std::cerr << afterForce.error;
