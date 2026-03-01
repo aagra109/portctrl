@@ -1,5 +1,6 @@
 #include "who_command.h"
 #include "port_inspection.h"
+#include "table_output.h"
 #include "types.h"
 #include "usage.h"
 
@@ -33,10 +34,11 @@ int runWhoCommand(int argc, char *argv[]) {
 
   std::cout << "Port " << *port << " is in use.\n";
   std::cout << "Listening endpoints: " << inspect.listeners.size() << "\n";
+  std::vector<std::vector<std::string>> rows;
+  rows.reserve(inspect.listeners.size());
   for (const auto &listener : inspect.listeners) {
-    std::cout << "PID: " << listener.pid << " | User: " << listener.user
-              << " | Process: " << listener.command << " | Endpoint: " << listener.endpoint
-              << "\n";
+    rows.push_back({listener.pid, listener.user, listener.command, listener.endpoint});
   }
+  std::cout << renderTable({"PID", "USER", "PROCESS", "ENDPOINT"}, rows) << "\n";
   return 0;
 }
