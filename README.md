@@ -49,6 +49,23 @@ make clean && make
 ./bin/portctrl
 ```
 
+## Testing
+
+Run unit tests:
+```bash
+make test-unit
+```
+
+Run integration tests:
+```bash
+make test-integration
+```
+
+Run all tests:
+```bash
+make test
+```
+
 ## Install
 
 Install globally (default target: `/usr/local/bin`):

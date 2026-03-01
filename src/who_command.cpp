@@ -1,3 +1,4 @@
+#include "exit_codes.h"
 #include "who_command.h"
 #include "port_inspection.h"
 #include "table_output.h"
@@ -11,25 +12,32 @@ int runWhoCommand(int argc, char *argv[]) {
   if (argc < 3) {
     std::cerr << "Missing port.\n";
     usage();
-    return 1;
+    return toExitCode(ExitCode::kUsage);
+  }
+  if (argc > 3) {
+    for (int i = 3; i < argc; ++i) {
+      std::cerr << "Unknown option for who: " << argv[i] << "\n";
+    }
+    usage();
+    return toExitCode(ExitCode::kUsage);
   }
   std::string portText = argv[2];
   auto port = parsePort(portText);
   if (!port.has_value()) {
     std::cerr << "Invalid port: " << portText << "\n";
-    return 1;
+    return toExitCode(ExitCode::kUsage);
   }
 
   InspectResult inspect = inspectPort(*port);
 
   if (inspect.status == InspectStatus::kError) {
     std::cerr << inspect.error << "\n";
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   if (inspect.status == InspectStatus::kFree || inspect.listeners.empty()) {
     std::cout << "Port " << *port << " appears free (no LISTEN process found).\n";
-    return 0;
+    return toExitCode(ExitCode::kOk);
   }
 
   std::cout << "Port " << *port << " is in use.\n";
@@ -40,5 +48,5 @@ int runWhoCommand(int argc, char *argv[]) {
     rows.push_back({listener.pid, listener.user, listener.command, listener.endpoint});
   }
   std::cout << renderTable({"PID", "USER", "PROCESS", "ENDPOINT"}, rows) << "\n";
-  return 0;
+  return toExitCode(ExitCode::kOk);
 }
