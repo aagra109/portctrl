@@ -72,18 +72,48 @@ CommandResult runCommand(const std::string &command) {
 
   ::close(pipefd[1]);
   char buffer[256];
-  ssize_t bytesRead = 0;
-  while ((bytesRead = ::read(pipefd[0], buffer, sizeof(buffer))) > 0) {
-    result.output.append(buffer, static_cast<std::size_t>(bytesRead));
+  bool readFailed = false;
+  int readErrno = 0;
+  while (true) {
+    ssize_t bytesRead = ::read(pipefd[0], buffer, sizeof(buffer));
+    if (bytesRead > 0) {
+      result.output.append(buffer, static_cast<std::size_t>(bytesRead));
+      continue;
+    }
+    if (bytesRead == 0) {
+      break;
+    }
+
+    if (errno == EINTR) {
+      continue;
+    }
+
+    readFailed = true;
+    readErrno = errno;
+    break;
   }
   ::close(pipefd[0]);
 
   int status = 0;
-  if (::waitpid(pid, &status, 0) < 0) {
+  pid_t waitResult = -1;
+  do {
+    waitResult = ::waitpid(pid, &status, 0);
+  } while (waitResult < 0 && errno == EINTR);
+
+  if (waitResult < 0) {
     result.exitCode = 1;
     if (result.output.empty()) {
       result.output = std::string("waitpid failed: ") + std::strerror(errno);
     }
+    return result;
+  }
+
+  if (readFailed) {
+    result.exitCode = 1;
+    if (!result.output.empty()) {
+      result.output += "\n";
+    }
+    result.output += std::string("Failed to read command output: ") + std::strerror(readErrno);
     return result;
   }
 
