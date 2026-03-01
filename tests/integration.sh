@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BIN="./bin/portctrl"
+ALLOW_LISTENER_SETUP_SKIP="${PORTCTRL_INTEGRATION_ALLOW_SETUP_SKIP:-0}"
 
 if [[ ! -x "${BIN}" ]]; then
   echo "integration tests: missing binary ${BIN}" >&2
@@ -113,9 +114,12 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
 done
 
 if [[ -z "${TEST_PORT}" ]]; then
-  echo "integration tests: unable to start dedicated listener; skipping free apply checks"
-  echo "integration tests: ok"
-  exit 0
+  if [[ "${ALLOW_LISTENER_SETUP_SKIP}" == "1" ]]; then
+    echo "integration tests: unable to start dedicated listener; skipping free apply checks (PORTCTRL_INTEGRATION_ALLOW_SETUP_SKIP=1)"
+    echo "integration tests: ok"
+    exit 0
+  fi
+  fail "unable to start dedicated listener for free apply checks"
 fi
 
 if ! lsof -nP -iTCP:"${TEST_PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
