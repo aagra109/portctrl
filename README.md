@@ -49,6 +49,27 @@ make clean && make
 ./bin/portctrl
 ```
 
+## Install
+
+Install globally (default target: `/usr/local/bin`):
+```bash
+make install
+```
+Depending on your system permissions, you may need:
+```bash
+sudo make install
+```
+
+Install to a user-local prefix:
+```bash
+make install PREFIX=$HOME/.local
+```
+
+Uninstall:
+```bash
+make uninstall
+```
+
 ## Commands
 
 ### `who <port>`
