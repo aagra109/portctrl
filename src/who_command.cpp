@@ -31,11 +31,12 @@ int runWhoCommand(int argc, char *argv[]) {
     return 0;
   }
 
-  const ListenerInfo &info = inspect.listeners.front();
   std::cout << "Port " << *port << " is in use.\n";
-  std::cout << "Process: " << info.command << "\n";
-  std::cout << "PID: " << info.pid << "\n";
-  std::cout << "User: " << info.user << "\n";
-  std::cout << "Endpoint: " << info.endpoint << "\n";
+  std::cout << "Listening endpoints: " << inspect.listeners.size() << "\n";
+  for (const auto &listener : inspect.listeners) {
+    std::cout << "PID: " << listener.pid << " | User: " << listener.user
+              << " | Process: " << listener.command << " | Endpoint: " << listener.endpoint
+              << "\n";
+  }
   return 0;
 }
