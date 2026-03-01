@@ -69,6 +69,11 @@ Uninstall:
 ```bash
 make uninstall
 ```
+If you installed with custom variables, use the same values for uninstall:
+```bash
+make uninstall PREFIX=$HOME/.local
+make uninstall PREFIX=/usr/local DESTDIR=/path/to/stage
+```
 
 ## Commands
 
