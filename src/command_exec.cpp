@@ -7,32 +7,9 @@
 #include <vector>
 #include <sys/wait.h>
 
-static std::vector<std::string> splitArgs(const std::string &command) {
-  std::vector<std::string> args;
-  std::string current;
-
-  for (char ch : command) {
-    if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') {
-      if (!current.empty()) {
-        args.push_back(current);
-        current.clear();
-      }
-      continue;
-    }
-    current.push_back(ch);
-  }
-
-  if (!current.empty()) {
-    args.push_back(current);
-  }
-
-  return args;
-}
-
-CommandResult runCommand(const std::string &command) {
+CommandResult runCommand(const std::vector<std::string> &args) {
   CommandResult result{1, ""};
 
-  std::vector<std::string> args = splitArgs(command);
   if (args.empty()) {
     result.output = "Failed to execute command.";
     return result;
