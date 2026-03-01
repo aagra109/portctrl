@@ -8,8 +8,9 @@ TARGET := bin/portctrl
 APP_SRC_NO_MAIN := $(filter-out src/main.cpp,$(SRC))
 UNIT_TEST_SRC := tests/unit_tests.cpp
 UNIT_TEST_BIN := bin/portctrl_unit_tests
+INTEGRATION_TEST_SCRIPT := tests/integration.sh
 
-.PHONY: all clean install uninstall test-unit
+.PHONY: all clean install uninstall test-unit test-integration test
 
 all: $(TARGET)
 
@@ -33,3 +34,8 @@ $(UNIT_TEST_BIN): $(APP_SRC_NO_MAIN) $(UNIT_TEST_SRC)
 
 test-unit: $(UNIT_TEST_BIN)
 	./$(UNIT_TEST_BIN)
+
+test-integration: $(TARGET) $(INTEGRATION_TEST_SCRIPT)
+	bash $(INTEGRATION_TEST_SCRIPT)
+
+test: test-unit test-integration
