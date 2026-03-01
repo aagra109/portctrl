@@ -9,4 +9,4 @@
 std::optional<pid_t> parseSignalablePid(const std::string &text);
 std::string gracefulSignalName(GracefulSignal signal);
 int gracefulSignalValue(GracefulSignal signal);
-bool sendSignalToPid(pid_t pid, int signalValue, std::string &error);
+bool sendSignalToPid(pid_t pid, int signalValue, std::string &error, int *errorNumber = nullptr);

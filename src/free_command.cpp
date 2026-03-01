@@ -1,3 +1,5 @@
+#include "cli_constants.h"
+#include "exit_codes.h"
 #include "free_command.h"
 #include "free_options.h"
 #include "port_inspection.h"
@@ -16,32 +18,38 @@
 #include <unistd.h>
 #include <vector>
 
-static bool confirmAction(const std::string &prompt, bool autoYes) {
+enum class ConfirmResult {
+  kConfirmed,
+  kDeclined,
+  kRequiresYes,
+};
+
+static ConfirmResult confirmAction(const std::string &prompt, bool autoYes) {
   if (autoYes) {
-    return true;
+    return ConfirmResult::kConfirmed;
   }
 
   if (!isatty(STDIN_FILENO)) {
     std::cerr << "Refusing to proceed in non-interactive mode without --yes.\n";
-    return false;
+    return ConfirmResult::kRequiresYes;
   }
 
   std::cout << prompt << " [y/N]: ";
   std::string answer;
   if (!std::getline(std::cin, answer)) {
     std::cout << "Cancelled.\n";
-    return false;
+    return ConfirmResult::kDeclined;
   }
 
   for (char &ch : answer) {
     ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
   }
   if (answer == "Y" || answer == "YES") {
-    return true;
+    return ConfirmResult::kConfirmed;
   }
 
   std::cout << "Cancelled.\n";
-  return false;
+  return ConfirmResult::kDeclined;
 }
 
 static bool collectSignalablePids(const std::vector<ListenerInfo> &listeners,
@@ -75,17 +83,18 @@ static std::string joinPids(const std::vector<pid_t> &pids) {
   return joined;
 }
 
-static bool sendSignalToAll(const std::vector<pid_t> &pids, int signalValue,
-                            const std::string &signalName) {
+static ExitCode sendSignalToAll(const std::vector<pid_t> &pids, int signalValue,
+                                const std::string &signalName) {
   std::string signalError;
   for (pid_t pid : pids) {
-    if (!sendSignalToPid(pid, signalValue, signalError)) {
+    int signalErrno = 0;
+    if (!sendSignalToPid(pid, signalValue, signalError, &signalErrno)) {
       std::cerr << "Failed to send SIG" << signalName << " to PID " << pid << ".\n";
       std::cerr << signalError << "\n";
-      return false;
+      return classifySignalErrno(signalErrno);
     }
   }
-  return true;
+  return ExitCode::kOk;
 }
 
 static std::vector<std::vector<std::string>>
@@ -102,32 +111,32 @@ int runFreeCommand(int argc, char *argv[]) {
   if (argc < 3) {
     std::cerr << "Missing port.\n";
     usage();
-    return 1;
+    return toExitCode(ExitCode::kUsage);
   }
 
   std::string portText = argv[2];
   auto port = parsePort(portText);
   if (!port.has_value()) {
     std::cerr << "Invalid port: " << portText << "\n";
-    return 1;
+    return toExitCode(ExitCode::kUsage);
   }
 
   FreeOptions options;
   std::string optionError;
   if (!parseFreeOptions(argc, argv, options, optionError)) {
     std::cerr << optionError << "\n";
-    return 1;
+    return toExitCode(ExitCode::kUsage);
   }
 
   InspectResult inspect = inspectPort(*port);
   if (inspect.status == InspectStatus::kError) {
     std::cerr << inspect.error << "\n";
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   if (inspect.status == InspectStatus::kFree || inspect.listeners.empty()) {
     std::cout << "Port " << *port << " is already free.\n";
-    return 0;
+    return toExitCode(ExitCode::kOk);
   }
 
   std::cout << "Current listeners:\n";
@@ -139,7 +148,7 @@ int runFreeCommand(int argc, char *argv[]) {
   std::string invalidPid;
   if (!collectSignalablePids(inspect.listeners, initialPids, invalidPid)) {
     std::cerr << "Refusing to signal invalid PID '" << invalidPid << "'.\n";
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   const std::string gracefulName = gracefulSignalName(options.gracefulSignal);
@@ -155,16 +164,23 @@ int runFreeCommand(int argc, char *argv[]) {
       std::cout << " --signal " << gracefulName;
     }
     std::cout << "\n";
-    return 0;
+    return toExitCode(ExitCode::kOk);
   }
 
-  if (!confirmAction("Send SIG" + gracefulName + " to PIDs " + joinPids(initialPids) + "?",
-                     options.yes)) {
-    return 1;
+  ConfirmResult gracefulConfirm =
+      confirmAction("Send SIG" + gracefulName + " to PIDs " + joinPids(initialPids) + "?",
+                    options.yes);
+  if (gracefulConfirm == ConfirmResult::kRequiresYes) {
+    return toExitCode(ExitCode::kUsage);
+  }
+  if (gracefulConfirm == ConfirmResult::kDeclined) {
+    return toExitCode(ExitCode::kUnresolved);
   }
 
-  if (!sendSignalToAll(initialPids, gracefulSignalValue(options.gracefulSignal), gracefulName)) {
-    return 1;
+  ExitCode gracefulSignalResult =
+      sendSignalToAll(initialPids, gracefulSignalValue(options.gracefulSignal), gracefulName);
+  if (gracefulSignalResult != ExitCode::kOk) {
+    return toExitCode(gracefulSignalResult);
   }
 
   std::this_thread::sleep_for(std::chrono::milliseconds(900));
@@ -174,12 +190,12 @@ int runFreeCommand(int argc, char *argv[]) {
   if (afterGraceful.status == InspectStatus::kError) {
     std::cerr << "Sent SIG" << gracefulName << ", but failed to re-check port " << *port << ".\n";
     std::cerr << afterGraceful.error;
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   if (afterGraceful.status == InspectStatus::kFree || afterGraceful.listeners.empty()) {
     std::cout << "Success: port " << *port << " is now free.\n";
-    return 0;
+    return toExitCode(ExitCode::kOk);
   }
 
   std::cout << "Port is still busy after SIG" << gracefulName << ".\n";
@@ -189,13 +205,13 @@ int runFreeCommand(int argc, char *argv[]) {
             << "\n";
   if (!options.force) {
     std::cout << "Re-run with --apply --force to escalate to SIGKILL.\n";
-    return 1;
+    return toExitCode(ExitCode::kUnresolved);
   }
 
   std::vector<pid_t> currentPids;
   if (!collectSignalablePids(afterGraceful.listeners, currentPids, invalidPid)) {
     std::cerr << "Refusing to signal invalid PID '" << invalidPid << "'.\n";
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   if (currentPids != initialPids) {
@@ -203,12 +219,18 @@ int runFreeCommand(int argc, char *argv[]) {
               << joinPids(currentPids) << "] before force escalation.\n";
   }
 
-  if (!confirmAction("Send SIGKILL to PIDs " + joinPids(currentPids) + "?", options.yes)) {
-    return 1;
+  ConfirmResult forceConfirm =
+      confirmAction("Send SIGKILL to PIDs " + joinPids(currentPids) + "?", options.yes);
+  if (forceConfirm == ConfirmResult::kRequiresYes) {
+    return toExitCode(ExitCode::kUsage);
+  }
+  if (forceConfirm == ConfirmResult::kDeclined) {
+    return toExitCode(ExitCode::kUnresolved);
   }
 
-  if (!sendSignalToAll(currentPids, SIGKILL, "KILL")) {
-    return 1;
+  ExitCode forceSignalResult = sendSignalToAll(currentPids, SIGKILL, kSignalNameKill);
+  if (forceSignalResult != ExitCode::kOk) {
+    return toExitCode(forceSignalResult);
   }
 
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -217,12 +239,12 @@ int runFreeCommand(int argc, char *argv[]) {
   if (afterForce.status == InspectStatus::kError) {
     std::cerr << "Sent SIGKILL, but failed to re-check port " << *port << ".\n";
     std::cerr << afterForce.error;
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   if (afterForce.status == InspectStatus::kFree || afterForce.listeners.empty()) {
     std::cout << "Success: port " << *port << " is now free.\n";
-    return 0;
+    return toExitCode(ExitCode::kOk);
   }
 
   std::vector<pid_t> remainingPids;
@@ -239,5 +261,5 @@ int runFreeCommand(int argc, char *argv[]) {
             << afterForce.listeners.front().command << " (PID " << afterForce.listeners.front().pid
             << ").\n";
 
-  return 1;
+  return toExitCode(ExitCode::kUnresolved);
 }

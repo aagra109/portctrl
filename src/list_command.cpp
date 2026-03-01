@@ -1,3 +1,4 @@
+#include "exit_codes.h"
 #include "list_command.h"
 #include "command_exec.h"
 #include "table_output.h"
@@ -123,7 +124,7 @@ int runListCommand(int argc, char *argv[]) {
   for (int i = 2; i < argc; ++i) {
     std::cerr << "Unknown option for list: " << argv[i] << "\n";
     usage();
-    return 1;
+    return toExitCode(ExitCode::kUsage);
   }
 
   const std::string command = "lsof -nP -iTCP -sTCP:LISTEN -Fpcun";
@@ -131,7 +132,7 @@ int runListCommand(int argc, char *argv[]) {
 
   if (result.exitCode == 1 && result.output.empty()) {
     std::cout << "No listening TCP ports found.\n";
-    return 0;
+    return toExitCode(ExitCode::kOk);
   }
 
   if (result.exitCode != 0 && result.exitCode != 1) {
@@ -139,23 +140,23 @@ int runListCommand(int argc, char *argv[]) {
     if (!result.output.empty()) {
       std::cerr << result.output;
     }
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   if (result.exitCode == 1 && !result.output.empty()) {
     std::cerr << "Failed to list listening ports.\n" << result.output;
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   if (result.output.empty()) {
     std::cout << "No listening TCP ports found.\n";
-    return 0;
+    return toExitCode(ExitCode::kOk);
   }
 
   std::vector<ListenerEntry> listeners = parseListeners(result.output);
   if (listeners.empty()) {
     std::cerr << "Failed to parse listener data.\nRaw lsof fields:\n" << result.output;
-    return 1;
+    return toExitCode(ExitCode::kInspectFailure);
   }
 
   std::sort(listeners.begin(), listeners.end(), sortByPortThenPid);
@@ -172,5 +173,5 @@ int runListCommand(int argc, char *argv[]) {
   }
   std::cout << renderTable({"PORT", "PID", "USER", "PROCESS", "ENDPOINT"}, rows) << "\n";
 
-  return 0;
+  return toExitCode(ExitCode::kOk);
 }

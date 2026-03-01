@@ -64,11 +64,14 @@ int gracefulSignalValue(GracefulSignal signal) {
   }
 }
 
-bool sendSignalToPid(pid_t pid, int signalValue, std::string &error) {
+bool sendSignalToPid(pid_t pid, int signalValue, std::string &error, int *errorNumber) {
   if (::kill(pid, signalValue) == 0) {
     return true;
   }
 
+  if (errorNumber != nullptr) {
+    *errorNumber = errno;
+  }
   error = std::string("kill(") + std::to_string(pid) + ", " + std::to_string(signalValue) +
           ") failed: " + std::strerror(errno);
   return false;
