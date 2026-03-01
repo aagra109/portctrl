@@ -69,10 +69,11 @@ bool sendSignalToPid(pid_t pid, int signalValue, std::string &error, int *errorN
     return true;
   }
 
+  const int savedErrno = errno;
   if (errorNumber != nullptr) {
-    *errorNumber = errno;
+    *errorNumber = savedErrno;
   }
   error = std::string("kill(") + std::to_string(pid) + ", " + std::to_string(signalValue) +
-          ") failed: " + std::strerror(errno);
+          ") failed: " + std::strerror(savedErrno);
   return false;
 }
