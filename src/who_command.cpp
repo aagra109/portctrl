@@ -14,6 +14,13 @@ int runWhoCommand(int argc, char *argv[]) {
     usage();
     return toExitCode(ExitCode::kUsage);
   }
+  if (argc > 3) {
+    for (int i = 3; i < argc; ++i) {
+      std::cerr << "Unknown option for who: " << argv[i] << "\n";
+    }
+    usage();
+    return toExitCode(ExitCode::kUsage);
+  }
   std::string portText = argv[2];
   auto port = parsePort(portText);
   if (!port.has_value()) {

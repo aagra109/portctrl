@@ -57,6 +57,7 @@ expect_exit_one_of() {
 expect_exit 1 "no args usage" "${BIN}"
 expect_exit 1 "unknown command usage" "${BIN}" nope
 expect_exit 1 "invalid port usage" "${BIN}" who abc
+expect_exit 1 "invalid option usage" "${BIN}" who 3000 --bad
 expect_exit 1 "invalid option usage" "${BIN}" list --bad
 
 # Clear PATH so lsof cannot be found; this should map to inspect/runtime failure.
@@ -65,8 +66,12 @@ expect_exit 2 "inspect failure without lsof" env PATH="" "${BIN}" list
 if ! command -v python3 >/dev/null 2>&1; then
   fail "python3 is required for integration tests"
 fi
+if ! command -v lsof >/dev/null 2>&1; then
+  fail "lsof is required for integration tests"
+fi
 
 PORT_FILE=$(mktemp)
+LISTENER_ERR_FILE=$(mktemp)
 LISTENER_PID=""
 TEST_PORT=""
 
@@ -74,7 +79,7 @@ cleanup() {
   if [[ -n "${LISTENER_PID}" ]]; then
     kill -9 "${LISTENER_PID}" >/dev/null 2>&1 || true
   fi
-  rm -f "${PORT_FILE}"
+  rm -f "${PORT_FILE}" "${LISTENER_ERR_FILE}"
 }
 trap cleanup EXIT
 
@@ -99,10 +104,10 @@ with open(os.environ["PORT_FILE"], "w", encoding="utf-8") as fp:
 
 while True:
     time.sleep(1)
-' >/dev/null 2>&1 &
+' >/dev/null 2>"${LISTENER_ERR_FILE}" &
 LISTENER_PID=$!
 
-for _ in 1 2 3 4 5 6 7 8 9 10; do
+for _ in {1..50}; do
   if [[ -s "${PORT_FILE}" ]]; then
     TEST_PORT=$(cat "${PORT_FILE}")
     break
@@ -118,6 +123,10 @@ if [[ -z "${TEST_PORT}" ]]; then
     echo "integration tests: unable to start dedicated listener; skipping free apply checks (PORTCTRL_INTEGRATION_ALLOW_SETUP_SKIP=1)"
     echo "integration tests: ok"
     exit 0
+  fi
+  if [[ -s "${LISTENER_ERR_FILE}" ]]; then
+    echo "integration tests: listener setup stderr follows:" >&2
+    cat "${LISTENER_ERR_FILE}" >&2
   fi
   fail "unable to start dedicated listener for free apply checks"
 fi
