@@ -1,7 +1,7 @@
 #pragma once
 
-#include <optional>
 #include <string>
+#include <vector>
 
 struct CommandResult {
   int exitCode = -1;
@@ -35,6 +35,6 @@ enum class InspectStatus {
 
 struct InspectResult {
   InspectStatus status = InspectStatus::kError;
-  std::optional<ListenerInfo> listener;
+  std::vector<ListenerInfo> listeners;
   std::string error;
 };

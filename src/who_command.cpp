@@ -26,12 +26,12 @@ int runWhoCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  if (inspect.status == InspectStatus::kFree || !inspect.listener.has_value()) {
+  if (inspect.status == InspectStatus::kFree || inspect.listeners.empty()) {
     std::cout << "Port " << *port << " appears free (no LISTEN process found).\n";
     return 0;
   }
 
-  const ListenerInfo &info = *inspect.listener;
+  const ListenerInfo &info = inspect.listeners.front();
   std::cout << "Port " << *port << " is in use.\n";
   std::cout << "Process: " << info.command << "\n";
   std::cout << "PID: " << info.pid << "\n";

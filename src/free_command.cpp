@@ -68,12 +68,12 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  if (inspect.status == InspectStatus::kFree || !inspect.listener.has_value()) {
+  if (inspect.status == InspectStatus::kFree || inspect.listeners.empty()) {
     std::cout << "Port " << *port << " is already free.\n";
     return 0;
   }
 
-  const ListenerInfo initialListener = *inspect.listener;
+  const ListenerInfo initialListener = inspect.listeners.front();
   auto initialPid = parseSignalablePid(initialListener.pid);
 
   if (!initialPid.has_value()) {
@@ -118,7 +118,7 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  if (afterGraceful.status == InspectStatus::kFree || !afterGraceful.listener.has_value()) {
+  if (afterGraceful.status == InspectStatus::kFree || afterGraceful.listeners.empty()) {
     std::cout << "Success: port " << *port << " is now free.\n";
     return 0;
   }
@@ -129,7 +129,7 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  const ListenerInfo currentListener = *afterGraceful.listener;
+  const ListenerInfo currentListener = afterGraceful.listeners.front();
   auto currentPid = parseSignalablePid(currentListener.pid);
 
   if (!currentPid.has_value()) {
@@ -161,13 +161,14 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  if (afterForce.status == InspectStatus::kFree || !afterForce.listener.has_value()) {
+  if (afterForce.status == InspectStatus::kFree || afterForce.listeners.empty()) {
     std::cout << "Success: port " << *port << " is now free.\n";
     return 0;
   }
 
   std::cerr << "Port " << *port << " is still in use after SIGKILL by process "
-            << afterForce.listener->command << " (PID " << afterForce.listener->pid << ").\n";
+            << afterForce.listeners.front().command << " (PID " << afterForce.listeners.front().pid
+            << ").\n";
 
   return 1;
 }

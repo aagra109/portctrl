@@ -122,6 +122,6 @@ InspectResult inspectPort(int port) {
   }
 
   inspect.status = InspectStatus::kOccupied;
-  inspect.listener = parsedListener;
+  inspect.listeners.push_back(parsedListener);
   return inspect;
 }
