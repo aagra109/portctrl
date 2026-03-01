@@ -2,6 +2,7 @@
 #include "free_options.h"
 #include "port_inspection.h"
 #include "process_actions.h"
+#include "table_output.h"
 #include "types.h"
 #include "usage.h"
 
@@ -87,6 +88,16 @@ static bool sendSignalToAll(const std::vector<pid_t> &pids, int signalValue,
   return true;
 }
 
+static std::vector<std::vector<std::string>>
+listenerRowsForTable(const std::vector<ListenerInfo> &listeners) {
+  std::vector<std::vector<std::string>> rows;
+  rows.reserve(listeners.size());
+  for (const auto &listener : listeners) {
+    rows.push_back({listener.pid, listener.user, listener.command, listener.endpoint});
+  }
+  return rows;
+}
+
 int runFreeCommand(int argc, char *argv[]) {
   if (argc < 3) {
     std::cerr << "Missing port.\n";
@@ -118,6 +129,11 @@ int runFreeCommand(int argc, char *argv[]) {
     std::cout << "Port " << *port << " is already free.\n";
     return 0;
   }
+
+  std::cout << "Current listeners:\n";
+  std::cout << renderTable({"PID", "USER", "PROCESS", "ENDPOINT"},
+                           listenerRowsForTable(inspect.listeners))
+            << "\n";
 
   std::vector<pid_t> initialPids;
   std::string invalidPid;
@@ -167,6 +183,10 @@ int runFreeCommand(int argc, char *argv[]) {
   }
 
   std::cout << "Port is still busy after SIG" << gracefulName << ".\n";
+  std::cout << "Listeners after graceful attempt:\n";
+  std::cout << renderTable({"PID", "USER", "PROCESS", "ENDPOINT"},
+                           listenerRowsForTable(afterGraceful.listeners))
+            << "\n";
   if (!options.force) {
     std::cout << "Re-run with --apply --force to escalate to SIGKILL.\n";
     return 1;
@@ -210,6 +230,10 @@ int runFreeCommand(int argc, char *argv[]) {
   if (collectSignalablePids(afterForce.listeners, remainingPids, remainingPidError)) {
     std::cerr << "Remaining listener PIDs: " << joinPids(remainingPids) << "\n";
   }
+  std::cerr << "Remaining listeners:\n";
+  std::cerr << renderTable({"PID", "USER", "PROCESS", "ENDPOINT"},
+                           listenerRowsForTable(afterForce.listeners))
+            << "\n";
 
   std::cerr << "Port " << *port << " is still in use after SIGKILL by process "
             << afterForce.listeners.front().command << " (PID " << afterForce.listeners.front().pid

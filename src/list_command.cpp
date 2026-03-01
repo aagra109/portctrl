@@ -1,5 +1,6 @@
 #include "list_command.h"
 #include "command_exec.h"
+#include "table_output.h"
 #include "usage.h"
 
 #include <algorithm>
@@ -162,11 +163,14 @@ int runListCommand(int argc, char *argv[]) {
   listeners.erase(std::unique(listeners.begin(), listeners.end(), sameListener), listeners.end());
 
   std::cout << "Listening TCP endpoints: " << listeners.size() << "\n";
+  std::vector<std::vector<std::string>> rows;
+  rows.reserve(listeners.size());
   for (const auto &listener : listeners) {
     std::string portText = listener.port > 0 ? std::to_string(listener.port) : "unknown";
-    std::cout << "Port: " << portText << " | PID: " << listener.pid << " | User: " << listener.user
-              << " | Process: " << listener.command << " | Endpoint: " << listener.endpoint << "\n";
+    rows.push_back(
+        {portText, listener.pid, listener.user, listener.command, listener.endpoint});
   }
+  std::cout << renderTable({"PORT", "PID", "USER", "PROCESS", "ENDPOINT"}, rows) << "\n";
 
   return 0;
 }
