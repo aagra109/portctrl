@@ -2,6 +2,7 @@
 #include "command_exec.h"
 
 #include <cctype>
+#include <algorithm>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -37,12 +38,30 @@ static std::vector<std::string> splitLines(const std::string &text) {
   return lines;
 }
 
-static bool parseFirstListener(const std::string &raw, ListenerInfo &out) {
+static bool sortByPidThenEndpoint(const ListenerInfo &a, const ListenerInfo &b) {
+  if (a.pid != b.pid) {
+    return a.pid < b.pid;
+  }
+  if (a.user != b.user) {
+    return a.user < b.user;
+  }
+  if (a.command != b.command) {
+    return a.command < b.command;
+  }
+  return a.endpoint < b.endpoint;
+}
+
+static bool sameListener(const ListenerInfo &a, const ListenerInfo &b) {
+  return a.pid == b.pid && a.user == b.user && a.command == b.command &&
+         a.endpoint == b.endpoint;
+}
+
+static std::vector<ListenerInfo> parseAllListeners(const std::string &raw) {
+  std::vector<ListenerInfo> listeners;
   auto lines = splitLines(raw);
   std::string currentPid;
   std::string currentCommand;
   std::string currentUser;
-  std::string currentEndpoint;
 
   for (const auto &line : lines) {
     if (line.size() < 2)
@@ -54,25 +73,25 @@ static bool parseFirstListener(const std::string &raw, ListenerInfo &out) {
       currentPid = value;
       currentCommand.clear();
       currentUser.clear();
-      currentEndpoint.clear();
     } else if (tag == 'c') {
       currentCommand = value;
     } else if (tag == 'u') {
       currentUser = value;
     } else if (tag == 'n') {
-      currentEndpoint = value;
-
       if (!currentPid.empty()) {
-        out.pid = currentPid;
-        out.command = currentCommand.empty() ? "unknown" : currentCommand;
-        out.user = currentUser.empty() ? "unknown" : currentUser;
-        out.endpoint = currentEndpoint;
-        return true;
+        ListenerInfo listener;
+        listener.pid = currentPid;
+        listener.command = currentCommand.empty() ? "unknown" : currentCommand;
+        listener.user = currentUser.empty() ? "unknown" : currentUser;
+        listener.endpoint = value;
+        listeners.push_back(listener);
       }
     }
   }
 
-  return false;
+  std::sort(listeners.begin(), listeners.end(), sortByPidThenEndpoint);
+  listeners.erase(std::unique(listeners.begin(), listeners.end(), sameListener), listeners.end());
+  return listeners;
 }
 
 static std::string listenerInspectCommand(int port) {
@@ -112,16 +131,14 @@ InspectResult inspectPort(int port) {
     return inspect;
   }
 
-  ListenerInfo parsedListener;
-  if (!parseFirstListener(result.output, parsedListener)) {
+  inspect.listeners = parseAllListeners(result.output);
+  if (inspect.listeners.empty()) {
     inspect.status = InspectStatus::kError;
     inspect.error = "Port " + std::to_string(port) +
-                    " appears occupied, but listener parsing failed.\nRaw lsof fields:\n" +
-                    result.output;
+                    " appears occupied, but listener parsing failed.\nRaw lsof fields:\n" + result.output;
     return inspect;
   }
 
   inspect.status = InspectStatus::kOccupied;
-  inspect.listener = parsedListener;
   return inspect;
 }

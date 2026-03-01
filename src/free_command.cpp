@@ -5,6 +5,7 @@
 #include "types.h"
 #include "usage.h"
 
+#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <csignal>
@@ -12,6 +13,7 @@
 #include <string>
 #include <thread>
 #include <unistd.h>
+#include <vector>
 
 static bool confirmAction(const std::string &prompt, bool autoYes) {
   if (autoYes) {
@@ -41,6 +43,50 @@ static bool confirmAction(const std::string &prompt, bool autoYes) {
   return false;
 }
 
+static bool collectSignalablePids(const std::vector<ListenerInfo> &listeners,
+                                  std::vector<pid_t> &pids, std::string &invalidPid) {
+  pids.clear();
+
+  for (const auto &listener : listeners) {
+    auto parsedPid = parseSignalablePid(listener.pid);
+    if (!parsedPid.has_value()) {
+      invalidPid = listener.pid;
+      return false;
+    }
+
+    if (std::find(pids.begin(), pids.end(), *parsedPid) == pids.end()) {
+      pids.push_back(*parsedPid);
+    }
+  }
+
+  std::sort(pids.begin(), pids.end());
+  return !pids.empty();
+}
+
+static std::string joinPids(const std::vector<pid_t> &pids) {
+  std::string joined;
+  for (std::size_t i = 0; i < pids.size(); ++i) {
+    if (i > 0) {
+      joined += ", ";
+    }
+    joined += std::to_string(pids[i]);
+  }
+  return joined;
+}
+
+static bool sendSignalToAll(const std::vector<pid_t> &pids, int signalValue,
+                            const std::string &signalName) {
+  std::string signalError;
+  for (pid_t pid : pids) {
+    if (!sendSignalToPid(pid, signalValue, signalError)) {
+      std::cerr << "Failed to send SIG" << signalName << " to PID " << pid << ".\n";
+      std::cerr << signalError << "\n";
+      return false;
+    }
+  }
+  return true;
+}
+
 int runFreeCommand(int argc, char *argv[]) {
   if (argc < 3) {
     std::cerr << "Missing port.\n";
@@ -68,22 +114,22 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  if (inspect.status == InspectStatus::kFree || !inspect.listener.has_value()) {
+  if (inspect.status == InspectStatus::kFree || inspect.listeners.empty()) {
     std::cout << "Port " << *port << " is already free.\n";
     return 0;
   }
 
-  const ListenerInfo initialListener = *inspect.listener;
-  auto initialPid = parseSignalablePid(initialListener.pid);
-
-  if (!initialPid.has_value()) {
-    std::cerr << "Refusing to signal invalid PID '" << initialListener.pid << "'.\n";
+  std::vector<pid_t> initialPids;
+  std::string invalidPid;
+  if (!collectSignalablePids(inspect.listeners, initialPids, invalidPid)) {
+    std::cerr << "Refusing to signal invalid PID '" << invalidPid << "'.\n";
     return 1;
   }
 
   const std::string gracefulName = gracefulSignalName(options.gracefulSignal);
-  std::cout << "Port " << *port << " is owned by " << initialListener.command << " (PID "
-            << initialListener.pid << ").\n";
+  std::cout << "Port " << *port << " has " << inspect.listeners.size() << " listening endpoint(s)"
+            << " across " << initialPids.size() << " process(es).\n";
+  std::cout << "Target PIDs: " << joinPids(initialPids) << "\n";
   std::cout << "Planned graceful signal: " << gracefulName << "\n";
 
   if (!options.apply) {
@@ -96,15 +142,12 @@ int runFreeCommand(int argc, char *argv[]) {
     return 0;
   }
 
-  if (!confirmAction("Send SIG" + gracefulName + " to PID " + std::to_string(*initialPid) + "?",
+  if (!confirmAction("Send SIG" + gracefulName + " to PIDs " + joinPids(initialPids) + "?",
                      options.yes)) {
     return 1;
   }
 
-  std::string signalError;
-  if (!sendSignalToPid(*initialPid, gracefulSignalValue(options.gracefulSignal), signalError)) {
-    std::cerr << "Failed to send SIG" << gracefulName << " to PID " << *initialPid << ".\n";
-    std::cerr << signalError << "\n";
+  if (!sendSignalToAll(initialPids, gracefulSignalValue(options.gracefulSignal), gracefulName)) {
     return 1;
   }
 
@@ -118,7 +161,7 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  if (afterGraceful.status == InspectStatus::kFree || !afterGraceful.listener.has_value()) {
+  if (afterGraceful.status == InspectStatus::kFree || afterGraceful.listeners.empty()) {
     std::cout << "Success: port " << *port << " is now free.\n";
     return 0;
   }
@@ -129,26 +172,22 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  const ListenerInfo currentListener = *afterGraceful.listener;
-  auto currentPid = parseSignalablePid(currentListener.pid);
-
-  if (!currentPid.has_value()) {
-    std::cerr << "Refusing to signal invalid PID '" << currentListener.pid << "'.\n";
+  std::vector<pid_t> currentPids;
+  if (!collectSignalablePids(afterGraceful.listeners, currentPids, invalidPid)) {
+    std::cerr << "Refusing to signal invalid PID '" << invalidPid << "'.\n";
     return 1;
   }
 
-  if (*currentPid != *initialPid) {
-    std::cout << "Listener PID changed from " << *initialPid << " to " << *currentPid
-              << " before force escalation.\n";
+  if (currentPids != initialPids) {
+    std::cout << "Listener PIDs changed from [" << joinPids(initialPids) << "] to ["
+              << joinPids(currentPids) << "] before force escalation.\n";
   }
 
-  if (!confirmAction("Send SIGKILL to PID " + std::to_string(*currentPid) + "?", options.yes)) {
+  if (!confirmAction("Send SIGKILL to PIDs " + joinPids(currentPids) + "?", options.yes)) {
     return 1;
   }
 
-  if (!sendSignalToPid(*currentPid, SIGKILL, signalError)) {
-    std::cerr << "Failed to send SIGKILL to PID " << *currentPid << ".\n";
-    std::cerr << signalError << "\n";
+  if (!sendSignalToAll(currentPids, SIGKILL, "KILL")) {
     return 1;
   }
 
@@ -161,13 +200,20 @@ int runFreeCommand(int argc, char *argv[]) {
     return 1;
   }
 
-  if (afterForce.status == InspectStatus::kFree || !afterForce.listener.has_value()) {
+  if (afterForce.status == InspectStatus::kFree || afterForce.listeners.empty()) {
     std::cout << "Success: port " << *port << " is now free.\n";
     return 0;
   }
 
+  std::vector<pid_t> remainingPids;
+  std::string remainingPidError;
+  if (collectSignalablePids(afterForce.listeners, remainingPids, remainingPidError)) {
+    std::cerr << "Remaining listener PIDs: " << joinPids(remainingPids) << "\n";
+  }
+
   std::cerr << "Port " << *port << " is still in use after SIGKILL by process "
-            << afterForce.listener->command << " (PID " << afterForce.listener->pid << ").\n";
+            << afterForce.listeners.front().command << " (PID " << afterForce.listeners.front().pid
+            << ").\n";
 
   return 1;
 }

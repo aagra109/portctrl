@@ -52,7 +52,7 @@ make clean && make
 ## Commands
 
 ### `who <port>`
-Shows which process is listening on one TCP port.
+Shows which process(es) are listening on one TCP port.
 ```bash
 ./bin/portctrl who 3000
 ```
@@ -69,9 +69,9 @@ Safely frees a busy port.
 
 Behavior:
 - default is dry-run (no signal sent)
-- `--apply` sends a graceful signal (`SIGTERM` by default)
+- `--apply` sends a graceful signal (`SIGTERM` by default) to all listener PIDs on that port
 - `--signal INT` switches graceful signal to `SIGINT`
-- if still busy, `--force` (with `--apply`) can escalate to `SIGKILL`
+- if still busy, `--force` (with `--apply`) can escalate to `SIGKILL` for remaining listener PIDs
 - in non-interactive mode, destructive actions require `--yes`
 
 Examples:
