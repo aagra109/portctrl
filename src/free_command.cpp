@@ -1,6 +1,6 @@
+#include "free_command.h"
 #include "cli_constants.h"
 #include "exit_codes.h"
-#include "free_command.h"
 #include "free_options.h"
 #include "port_inspection.h"
 #include "process_actions.h"
@@ -190,9 +190,8 @@ int runFreeCommand(int argc, char *argv[]) {
     return toExitCode(ExitCode::kOk);
   }
 
-  ConfirmResult gracefulConfirm =
-      confirmAction("Send SIG" + gracefulName + " to PIDs " + joinPids(initialPids) + "?",
-                    options.yes);
+  ConfirmResult gracefulConfirm = confirmAction(
+      "Send SIG" + gracefulName + " to PIDs " + joinPids(initialPids) + "?", options.yes);
   if (gracefulConfirm == ConfirmResult::kRequiresYes) {
     return toExitCode(ExitCode::kUsage);
   }

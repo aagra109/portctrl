@@ -10,9 +10,7 @@ enum class ExitCode : int {
   kUnresolved = 4,
 };
 
-inline int toExitCode(ExitCode code) {
-  return static_cast<int>(code);
-}
+inline int toExitCode(ExitCode code) { return static_cast<int>(code); }
 
 inline ExitCode classifySignalErrno(int errorNumber) {
   if (errorNumber == EPERM) {
