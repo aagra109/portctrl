@@ -94,12 +94,12 @@ static std::vector<ListenerInfo> parseAllListeners(const std::string &raw) {
   return listeners;
 }
 
-static std::string listenerInspectCommand(int port) {
-  return "lsof -nP -iTCP:" + std::to_string(port) + " -sTCP:LISTEN -Fpcun";
+static std::vector<std::string> listenerInspectArgs(int port) {
+  return {"lsof", "-nP", "-iTCP:" + std::to_string(port), "-sTCP:LISTEN", "-Fpcun"};
 }
 
 static CommandResult runListenerInspectCommand(int port) {
-  return runCommand(listenerInspectCommand(port));
+  return runCommand(listenerInspectArgs(port));
 }
 
 InspectResult inspectPort(int port) {

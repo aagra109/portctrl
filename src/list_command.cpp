@@ -127,8 +127,7 @@ int runListCommand(int argc, char *argv[]) {
     return toExitCode(ExitCode::kUsage);
   }
 
-  const std::string command = "lsof -nP -iTCP -sTCP:LISTEN -Fpcun";
-  CommandResult result = runCommand(command);
+  CommandResult result = runCommand({"lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-Fpcun"});
 
   if (result.exitCode == 1 && result.output.empty()) {
     std::cout << "No listening TCP ports found.\n";
