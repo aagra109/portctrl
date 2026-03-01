@@ -56,12 +56,14 @@ Shows which process(es) are listening on one TCP port.
 ```bash
 ./bin/portctrl who 3000
 ```
+Output is shown in a table for easier scanning.
 
 ### `list`
 Lists listening TCP endpoints.
 ```bash
 ./bin/portctrl list
 ```
+Output is shown in a table for easier scanning.
 Note: one PID can appear on multiple rows if one process listens on multiple ports/endpoints.
 
 ### `free <port> [--apply] [--force] [--yes] [--signal INT|TERM]`
@@ -73,6 +75,7 @@ Behavior:
 - `--signal INT` switches graceful signal to `SIGINT`
 - if still busy, `--force` (with `--apply`) can escalate to `SIGKILL` for remaining listener PIDs
 - in non-interactive mode, destructive actions require `--yes`
+- listener sets in `free` are displayed in tables
 
 Examples:
 ```bash
