@@ -15,6 +15,17 @@ CommandResult runCommand(const std::vector<std::string> &args) {
     return result;
   }
 
+  std::vector<std::vector<char>> argBuffers;
+  argBuffers.reserve(args.size());
+  std::vector<char *> argv;
+  argv.reserve(args.size() + 1);
+  for (const auto &arg : args) {
+    argBuffers.emplace_back(arg.begin(), arg.end());
+    argBuffers.back().push_back('\0');
+    argv.push_back(argBuffers.back().data());
+  }
+  argv.push_back(nullptr);
+
   int pipefd[2];
   if (::pipe(pipefd) != 0) {
     result.output = std::string("Failed to create pipe: ") + std::strerror(errno);
@@ -35,13 +46,6 @@ CommandResult runCommand(const std::vector<std::string> &args) {
     ::dup2(pipefd[1], STDOUT_FILENO);
     ::dup2(pipefd[1], STDERR_FILENO);
     ::close(pipefd[1]);
-
-    std::vector<char *> argv;
-    argv.reserve(args.size() + 1);
-    for (auto &arg : args) {
-      argv.push_back(const_cast<char *>(arg.c_str()));
-    }
-    argv.push_back(nullptr);
 
     ::execvp(argv[0], argv.data());
     _exit(127);
